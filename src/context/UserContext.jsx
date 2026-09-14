@@ -3,7 +3,7 @@ import { createContext, useCallback, useEffect, useMemo, useState } from "react"
 const API_URL = import.meta.env.VITE_API_URL;
 export const UserContext = createContext(null);
 
-async function api(path, options = {}) {
+export async function api(path, options = {}) {
   return fetch(`${API_URL}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -56,6 +56,6 @@ export function UserProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, isLoggedIn: Boolean(user), isInitializing, loginError, login, logout }), [user, isInitializing, loginError, login, logout]);
+  const value = useMemo(() => ({ user, isLoggedIn: Boolean(user), isInitializing, loginError, login, logout, refreshSession }), [user, isInitializing, loginError, login, logout, refreshSession]);
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

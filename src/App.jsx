@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { api, UserContext } from "./context/UserContext";
+import { API_URL, api, UserContext } from "./context/UserContext";
 
 const initialItem = { name: "", description: "" };
 
@@ -32,6 +32,7 @@ function Items() {
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accessCheck, setAccessCheck] = useState(null);
   async function loadItems() {
     setLoading(true);
     try { const response = await api("/api/item"); const body = await response.json(); if (!response.ok) throw new Error(body.message ?? "Unable to load items"); setItems(body.items); }
@@ -39,6 +40,21 @@ function Items() {
     finally { setLoading(false); }
   }
   useEffect(() => { loadItems(); }, []);
+  async function verifyAccess() {
+    setAccessCheck({ loading: true });
+    try {
+      const [withoutCookie, withCookie] = await Promise.all([
+        fetch(`${API_URL}/api/item`, { credentials: "omit" }),
+        api("/api/item"),
+      ]);
+      setAccessCheck({
+        withoutCookie: `${withoutCookie.status} ${withoutCookie.statusText || "Unauthorized"}`,
+        withCookie: `${withCookie.status} ${withCookie.statusText || "OK"}`,
+      });
+    } catch {
+      setAccessCheck({ error: "Unable to run the access check." });
+    }
+  }
   function changeDraft(event) { setDraft((current) => ({ ...current, [event.target.name]: event.target.value })); }
   async function saveItem(event) {
     event.preventDefault(); setNotice(null); const editing = Boolean(editingId);
@@ -51,6 +67,7 @@ function Items() {
     catch (error) { setNotice({ kind: "error", message: error.message }); }
   }
   return <section className="page-content"><div className="page-heading"><div><p className="eyebrow">PROTECTED RESOURCE</p><h1>Items</h1><p className="muted">Every action below requires a valid HTTP-only cookie session.</p></div><button className="secondary" onClick={loadItems}>Refresh</button></div><Notice notice={notice} />
+    <section className="access-check panel"><div><h2>Session access check</h2><p className="muted">Runs the same <code>/api/item</code> request both without and with your HTTP-only cookie.</p></div><button className="secondary" onClick={verifyAccess}>{accessCheck?.loading ? "Checking…" : "Run check"}</button>{accessCheck?.error && <p className="notice error" role="alert">{accessCheck.error}</p>}{accessCheck && !accessCheck.loading && !accessCheck.error && <div className="access-results"><p><span>Without cookie</span><strong className="rejected">{accessCheck.withoutCookie}</strong></p><p><span>Signed-in session</span><strong className="allowed">{accessCheck.withCookie}</strong></p></div>}</section>
     <div className="two-column"><form className="panel" onSubmit={saveItem}><h2>{editingId ? "Edit item" : "Add item"}</h2><label>Item name<input name="name" value={draft.name} onChange={changeDraft} maxLength="120" required /></label><label>Description<textarea name="description" value={draft.description} onChange={changeDraft} maxLength="500" rows="5" /></label><div className="actions"><button type="submit">{editingId ? "Save changes" : "Create item"}</button>{editingId && <button className="text-button" type="button" onClick={() => { setEditingId(null); setDraft(initialItem); }}>Cancel</button>}</div></form>
       <section className="panel"><h2>Item records</h2>{loading ? <p className="muted">Loading protected data…</p> : items.length === 0 ? <p className="empty">No items yet. Create one to generate an audit record.</p> : <div className="item-list">{items.map((item) => <article className="item-row" key={item.id}><div><h3>{item.name}</h3><p>{item.description || "No description"}</p><small>Updated {formatDate(item.updatedAt)}</small></div><div className="row-actions"><button className="secondary" onClick={() => { setEditingId(item.id); setDraft({ name: item.name, description: item.description ?? "" }); }}>Edit</button><button className="danger" onClick={() => deleteItem(item)}>Delete</button></div></article>)}</div>}</section></div>
   </section>;
